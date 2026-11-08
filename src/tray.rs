@@ -24,6 +24,8 @@ pub enum TrayAction {
     ToggleMute,
     ToggleClickThrough,
     ResetPosition,
+    /// "Update to x.y.z": download and install the new version.
+    InstallUpdate,
     Quit,
 }
 
@@ -39,6 +41,8 @@ pub struct TrayState {
     /// The `.sstc` files to offer, and the one in use ("" = plain sit/stand).
     pub schedules: Vec<String>,
     pub selected_schedule: String,
+    /// A newer version to offer at the top of the menu, if there is one.
+    pub update_version: Option<String>,
 }
 
 pub struct Tray {
@@ -51,6 +55,12 @@ pub struct Tray {
     show_item: MenuItem,
     mute_item: CheckMenuItem,
     click_through_item: CheckMenuItem,
+    /// The whole menu, kept so the update item can be added and removed.
+    menu: Menu,
+    /// "Update to x.y.z" and the separator under it; only in the menu while an
+    /// update is available.
+    update_item: MenuItem,
+    update_separator: PredefinedMenuItem,
     actions: Receiver<TrayAction>,
     /// What's currently shown. `None` until the first `update`.
     shown: Option<TrayState>,
@@ -70,6 +80,8 @@ impl Tray {
         let click_through_item = CheckMenuItem::new("Click-through", true, false, None);
         let position_item = MenuItem::new("Reset widget position", true, None);
         let quit_item = MenuItem::new("Quit", true, None);
+        let update_item = MenuItem::new("Update", true, None);
+        let update_separator = PredefinedMenuItem::separator();
 
         let menu = Menu::new();
         // `and_then` runs the second step only if the first one worked.
@@ -106,6 +118,7 @@ impl Tray {
                 TrayAction::ToggleClickThrough,
             ),
             (position_item.id().clone(), TrayAction::ResetPosition),
+            (update_item.id().clone(), TrayAction::InstallUpdate),
             (quit_item.id().clone(), TrayAction::Quit),
         ];
 
@@ -129,7 +142,8 @@ impl Tray {
         }));
 
         let icon = TrayIconBuilder::new()
-            .with_menu(Box::new(menu))
+            // `Menu` is a shared handle, so the clone is the same menu, not a copy.
+            .with_menu(Box::new(menu.clone()))
             .with_tooltip("Sit/Stand Timer")
             .with_icon(dot_icon([128, 128, 128])?)
             .build();
@@ -150,6 +164,9 @@ impl Tray {
             show_item,
             mute_item,
             click_through_item,
+            menu,
+            update_item,
+            update_separator,
             actions,
             shown: None,
         })
@@ -191,7 +208,29 @@ impl Tray {
             self.rebuild_schedule_items(&state.schedules);
         }
         self.check_schedule(&state.selected_schedule);
+        // `.and_then(|old| ...)` looks inside the previous state, if there was one.
+        let old_update = self
+            .shown
+            .as_ref()
+            .and_then(|old| old.update_version.clone());
+        if old_update != state.update_version {
+            self.show_update(state.update_version.as_deref());
+        }
         self.shown = Some(state);
+    }
+
+    /// Puts "Update to x.y.z" at the top of the menu, or takes it away (`None`).
+    fn show_update(&self, version: Option<&str>) {
+        // Removing first means a changed version never adds the item twice.
+        // (Removing an item that isn't in the menu just returns an error we ignore.)
+        let _ = self.menu.remove(&self.update_item);
+        let _ = self.menu.remove(&self.update_separator);
+        if let Some(version) = version {
+            self.update_item.set_text(format!("Update to {version}"));
+            let _ = self
+                .menu
+                .prepend_items(&[&self.update_item, &self.update_separator]);
+        }
     }
 
     /// Clicking a check item flips its checkmark by itself, even when it's the schedule

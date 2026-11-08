@@ -16,6 +16,7 @@ use crate::schedule::{self, Reminder, Schedule, Step, describe_duration};
 use crate::single_instance::SingleInstance;
 use crate::timer::{Mode, Timer, TimerEvent};
 use crate::tray::{Tray, TrayAction, TrayState};
+use crate::update::Updates;
 
 // Window sizes, as [width, height] in points.
 const MAIN_SIZE: [f32; 2] = [140.0, 140.0];
@@ -350,6 +351,8 @@ pub struct SitStandApp {
     visible: bool,
     /// Signals from later launches of the app, asking this copy to show itself.
     show_requests: std::sync::mpsc::Receiver<()>,
+    /// Looks for new releases, and installs one when asked.
+    updates: Updates,
 }
 
 impl SitStandApp {
@@ -400,6 +403,7 @@ impl SitStandApp {
             tray: Tray::new(&cc.egui_ctx),
             visible: true,
             show_requests: instance.listen(&cc.egui_ctx),
+            updates: Updates::new(),
         }
     }
 
@@ -451,6 +455,14 @@ impl SitStandApp {
             self.config.schedule.clear();
         }
         self.reload_schedule(now);
+    }
+
+    /// Downloads and installs the available update. When that works the process
+    /// exits straight away (eframe's `on_exit` doesn't run), so save settings first.
+    fn install_update(&mut self, ctx: &egui::Context) {
+        self.config.save();
+        self.saved_config = self.config.clone();
+        self.updates.install(ctx);
     }
 
     /// Opens the system's "choose a folder" dialog for the schedules folder.
@@ -608,6 +620,7 @@ impl SitStandApp {
                 ctx.send_viewport_cmd(ViewportCommand::OuterPosition(egui::pos2(40.0, 40.0)));
                 self.set_visible(ctx, true);
             }
+            TrayAction::InstallUpdate => self.install_update(ctx),
             TrayAction::Quit => ctx.send_viewport_cmd(ViewportCommand::Close),
         }
     }
@@ -938,6 +951,9 @@ impl SitStandApp {
             self.set_click_through(ui.ctx(), click_through);
         }
 
+        section_heading(ui, "UPDATES", true);
+        self.update_settings(ui);
+
         section_heading(ui, "", true);
         ui.horizontal(|ui| {
             if ui.button("Test alert").clicked() {
@@ -959,6 +975,36 @@ impl SitStandApp {
             .small()
             .weak(),
         );
+    }
+
+    /// The UPDATES section of the settings: the version status, and a button to
+    /// check now or install what was found.
+    fn update_settings(&mut self, ui: &mut egui::Ui) {
+        ui.checkbox(&mut self.config.check_for_updates, "Check daily")
+            .on_hover_text(
+                "Look for a new version on GitHub once a day.\nInstalling always asks first.",
+            );
+        let status = ui.label(RichText::new(self.updates.status_text()).small().weak());
+        if let Some(err) = self.updates.check_error() {
+            status.on_hover_text(err);
+        }
+        // `if let ... else`: one button or the other, depending on whether an update was found.
+        if let Some(version) = self.updates.available_version() {
+            let label = format!("Update to {version}");
+            let installing = self.updates.is_installing();
+            if ui
+                .add_enabled(!installing, egui::Button::new(label))
+                .on_hover_text("Download and install it. The app restarts afterwards.")
+                .clicked()
+            {
+                self.install_update(ui.ctx());
+            }
+        } else if ui
+            .add_enabled(self.updates.can_check(), egui::Button::new("Check now"))
+            .clicked()
+        {
+            self.updates.check_now(ui.ctx());
+        }
     }
 
     /// The SCHEDULE section of the settings.
@@ -1228,6 +1274,9 @@ impl eframe::App for SitStandApp {
             self.last_save = now;
         }
 
+        // Finished update checks, and the next one if it's due.
+        let next_update_check = self.updates.poll(ctx, now, self.config.check_for_updates);
+
         // Keep the tray icon, tooltip and menu in sync.
         let minutes_left = self.timer.remaining(now).as_secs().div_ceil(60);
         let paused = if self.timer.is_running() {
@@ -1247,6 +1296,9 @@ impl eframe::App for SitStandApp {
             click_through: self.click_through,
             schedules: self.schedule_files.clone().unwrap_or_default(),
             selected_schedule: self.config.schedule.clone(),
+            // `.map(str::to_owned)` turns the borrowed `Option<&str>` into an owned
+            // `Option<String>`, since `TrayState` keeps its own copy.
+            update_version: self.updates.available_version().map(str::to_owned),
         };
         if let Some(tray) = &mut self.tray {
             tray.update(tray_state);
@@ -1271,6 +1323,9 @@ impl eframe::App for SitStandApp {
         if self.tray.is_some() {
             wake_in
                 .push(SCHEDULE_RESCAN.saturating_sub(now.duration_since(self.last_schedule_scan)));
+        }
+        if let Some(due) = next_update_check {
+            wake_in.push(due);
         }
         if let Some(&soonest) = wake_in.iter().min() {
             ctx.request_repaint_after(soonest);

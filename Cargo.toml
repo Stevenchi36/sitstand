@@ -1,6 +1,6 @@
 [package]
 name = "sitstand"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 
@@ -25,6 +25,8 @@ directories = "6"
 tray-icon = "0.26"
 # The system's own "choose a folder" dialog, for picking the schedules folder.
 rfd = "0.18"
+# Checks GitHub for a newer release and installs it (see src/update.rs).
+cargo-packager-updater = "0.2"
 
 # Only pulled in when building for Windows: direct access to the Windows API,
 # used for the window-edge fixes and the single-instance check.

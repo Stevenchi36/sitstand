@@ -42,8 +42,33 @@ jobs:
           tool: cargo-packager@0.11.8
 
       # Builds the release .exe and the NSIS installer (NSIS is downloaded by
-      # cargo-packager itself).
+      # cargo-packager itself). With the signing key set, it also writes
+      # `<installer>.sig`, which the in-app updater checks before installing.
       - run: cargo packager --release
+        env:
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
+
+      # The file the in-app updater reads (src/update.rs). It's attached to every
+      # release, and `releases/latest/download/latest.json` always points at the
+      # newest one.
+      - name: Write latest.json
+        run: |
+          $installer = "sitstand_${env:VERSION}_x64-setup.exe"
+          $sig = "target/release/$installer.sig"
+          if (-not (Test-Path $sig)) {
+            Write-Error "$sig is missing: is the signing key secret set?"
+            exit 1
+          }
+          [ordered]@{
+            version   = $env:VERSION
+            notes     = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+            pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            url       = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$installer"
+            signature = (Get-Content -Raw $sig).Trim()
+            format    = "nsis"
+          } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM target/release/latest.json
+          Get-Content target/release/latest.json
 
       - name: Create the GitHub Release
         env:
@@ -51,5 +76,7 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" `
             "target/release/sitstand_${env:VERSION}_x64-setup.exe" `
+            "target/release/sitstand_${env:VERSION}_x64-setup.exe.sig" `
+            "target/release/latest.json" `
             --title "Sit-Stand Timer $env:VERSION" `
             --generate-notes

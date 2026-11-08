@@ -120,6 +120,8 @@ pub struct Config {
     pub compact: bool,
     /// Window position (top-left corner, in screen points). `None` = let the OS decide.
     pub window_pos: Option<[f32; 2]>,
+    /// Look for a new release on GitHub once a day (installing still asks first).
+    pub check_for_updates: bool,
 }
 
 // `Default` is a standard trait: `Config::default()` gives the starting settings.
@@ -147,6 +149,7 @@ impl Default for Config {
             flash_style: FlashStyle::WholeWidget,
             compact: false,
             window_pos: None,
+            check_for_updates: true,
         }
     }
 }

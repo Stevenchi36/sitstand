@@ -46,9 +46,18 @@ This builds the release `.exe` and wraps it in
 `target\release\sitstand_<version>_x64-setup.exe`. Running that installs for
 your user only (no admin prompt) into `%LOCALAPPDATA%\Sit-Stand Timer`, adds a
 **Sit-Stand Timer** Start menu entry, and registers an uninstaller under
-Settings → Apps. To update, quit the app (tray → Quit) and run a newer setup
-file over the old install. Bump `version` in `Cargo.toml` so Settings shows the
-new number.
+Settings → Apps.
+
+### Updating
+
+From 0.2.0 on, the app checks GitHub once a day (setting **Check daily**, under
+UPDATES in the settings). When a newer release is out, **Update to x.y.z** appears
+at the top of the tray menu and in the settings. Clicking it downloads the
+installer, checks its signature, runs it with only a progress bar, and restarts
+the app. Settings and schedules are kept.
+
+Without that (or from 0.1.x), quit the app (tray → Quit) and run a newer setup
+file over the old install.
 
 ### Releasing
 
@@ -60,8 +69,12 @@ git push origin main --tags
 ```
 
 The Release workflow (`.github/workflows/release.yml`) checks the tag matches
-`Cargo.toml`, runs the tests, builds the installer and publishes it as a GitHub
-Release. CI (`.github/workflows/ci.yml`) runs `cargo fmt --check`, clippy (no
+`Cargo.toml`, runs the tests, builds and signs the installer, and publishes a
+GitHub Release with the installer, its `.sig` and `latest.json` (what the in-app
+updater reads). Signing uses the repo secrets `CARGO_PACKAGER_SIGN_PRIVATE_KEY`
+and `CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD`; the matching public key is
+`PUBLIC_KEY` in `src/update.rs`. Keep a backup of the private key and its
+password: without them, installed copies can't accept updates. CI (`.github/workflows/ci.yml`) runs `cargo fmt --check`, clippy (no
 warnings allowed) and the tests on every push and pull request.
 
 Installer options live under `[package.metadata.packager]` in `Cargo.toml`.
@@ -118,6 +131,7 @@ parsed, it's renamed to `config.toml.bad` and the app starts with defaults.
 | `flash_style` | `"whole_widget"` | How the widget flashes: `"whole_widget"` (background pulses), `"border"` (border pulses) or `"comet"` (a streak runs around the edge) |
 | `compact` | false | Show only the time |
 | `window_pos` | (unset) | Remembered window position |
+| `check_for_updates` | true | Look for a new release on GitHub once a day (installing still asks) |
 
 Click-through is deliberately *not* saved, so the widget always starts clickable.
 

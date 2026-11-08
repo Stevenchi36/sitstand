@@ -12,6 +12,7 @@ mod schedule;
 mod single_instance;
 mod timer;
 mod tray;
+mod update;
 
 use eframe::egui;
 

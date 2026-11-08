@@ -34,9 +34,14 @@ appears in a file, plain-English doc comments on every item.
 - **`.sstc` format:** specified in the module doc at the top of `schedule.rs`
   (the source of truth). The complete user reference is `docs/sstc-format.md`;
   any format change updates both, plus the `POMODORO` example's header comments.
-- **Background events** (tray menu, global hotkey, second-launch "show yourself") all
-  use one pattern: a callback on another thread sends into an `mpsc` channel and calls
-  `ctx.request_repaint()`; `logic` drains the channel.
+- **Background events** (tray menu, global hotkey, second-launch "show yourself",
+  folder dialog, update checks) all use one pattern: a callback on another thread
+  sends into an `mpsc` channel and calls `ctx.request_repaint()`; `logic` drains the
+  channel.
+- **Updates** (`update.rs`): `Updates::poll` in `logic` checks the newest release's
+  `latest.json` daily. Installing ends the process with `std::process::exit` (no
+  `on_exit`), so go through `SitStandApp::install_update`, which saves the config
+  first. `PUBLIC_KEY` must match the private key in the repo's signing secrets.
 
 ## egui gotchas
 
@@ -69,8 +74,9 @@ unsaved). When adding a field: give it a value in `impl Default`, clamp it in
 - Before finishing a change: `cargo fmt`, `cargo clippy --all-targets` (keep it at
   zero warnings), `cargo test`.
 - Releasing: bump `version` in `Cargo.toml`, commit, then push a matching tag
-  (`git tag v0.1.3 && git push --tags`). `.github/workflows/release.yml` builds the
-  installer and publishes the GitHub Release. `cargo packager --release` builds it locally.
+  (`git tag v0.1.3 && git push --tags`). `.github/workflows/release.yml` builds and
+  signs the installer, writes `latest.json`, and publishes the GitHub Release.
+  `cargo packager --release` builds an unsigned installer locally.
 - CI (`.github/workflows/ci.yml`) runs fmt, clippy with `-D warnings`, and tests on
   Windows for every push and PR.
 
