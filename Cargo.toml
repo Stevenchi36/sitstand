@@ -2,6 +2,7 @@
 name = "sitstand"
 version = "0.1.2"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 # `default-features = false` turns off optional parts we don't need, which keeps

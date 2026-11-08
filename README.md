@@ -165,3 +165,8 @@ docs/            sstc-format.md: the schedule file format reference
 - Windows is the tested platform. The code is written to build elsewhere, but a
   Linux build needs GTK development packages for the tray icon, and on Wayland
   windows generally can't force themselves always-on-top.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The bundled JetBrains Mono font is under the SIL Open
+Font License (`assets/OFL.txt`).
