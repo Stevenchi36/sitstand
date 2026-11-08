@@ -123,7 +123,9 @@ pub fn register_app_identity() {}
 
 /// Adds or removes this program from the ones Windows starts when you sign in.
 /// Uses the per-user `Run` registry key (no admin needed); the entry also shows
-/// up, and can be switched off, in Task Manager → Startup apps.
+/// up, and can be switched off, in Task Manager → Startup apps. The uninstaller
+/// deletes the same value (`preinstall-section` in Cargo.toml), so keep the key
+/// and name in step with it.
 #[cfg(target_os = "windows")]
 pub fn set_start_with_windows(on: bool) -> Result<(), String> {
     use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
@@ -175,6 +177,31 @@ pub fn set_start_with_windows(_on: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether `exe` was built by `cargo build` / `cargo run` rather than installed:
+/// it sits under a `target` folder, in `debug` or `release` (also
+/// `target\<platform>\release` for cross builds). Such a copy shouldn't take
+/// over the startup entry from the installed one.
+pub fn is_cargo_build(exe: &std::path::Path) -> bool {
+    // `components()` splits a path into its folders; `filter_map` keeps the ones
+    // that are plain names (as `&str`), skipping the drive letter and root.
+    let names: Vec<&str> = exe
+        .components()
+        .filter_map(|c| match c {
+            std::path::Component::Normal(name) => name.to_str(),
+            _ => None,
+        })
+        .collect();
+    // `position` finds the first `target` folder; `if let` runs only if there is one.
+    if let Some(i) = names.iter().position(|n| n.eq_ignore_ascii_case("target")) {
+        // `names[i + 1..]` is everything after `target` (an empty slice if nothing).
+        names[i + 1..]
+            .iter()
+            .any(|n| n.eq_ignore_ascii_case("debug") || n.eq_ignore_ascii_case("release"))
+    } else {
+        false
+    }
+}
+
 /// Show a folder in the system file manager (Explorer on Windows).
 pub fn open_folder(path: &std::path::Path) {
     #[cfg(target_os = "windows")]
@@ -186,5 +213,33 @@ pub fn open_folder(path: &std::path::Path) {
     // `spawn` starts it without waiting for it to finish.
     if let Err(err) = std::process::Command::new(program).arg(path).spawn() {
         eprintln!("Could not open {}: {err}", path.display());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn cargo_builds_are_recognised() {
+        for exe in [
+            r"C:\code\sitstand\target\debug\sitstand.exe",
+            r"C:\code\sitstand\target\release\sitstand.exe",
+            r"C:\code\sitstand\target\x86_64-pc-windows-msvc\release\sitstand.exe",
+        ] {
+            assert!(is_cargo_build(Path::new(exe)), "{exe}");
+        }
+    }
+
+    #[test]
+    fn installed_copies_are_not_cargo_builds() {
+        for exe in [
+            r"C:\Users\me\AppData\Local\Sit-Stand Timer\sitstand.exe",
+            r"D:\Apps\release\sitstand.exe",
+            r"D:\target practice\sitstand.exe",
+        ] {
+            assert!(!is_cargo_build(Path::new(exe)), "{exe}");
+        }
     }
 }

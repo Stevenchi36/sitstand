@@ -8,7 +8,7 @@ Release notes, so add one (moving things out of **Unreleased**) before tagging.
 ### Added
 
 - **Start with Windows** setting (bottom of the settings): starts the timer when
-  you sign in.
+  you sign in. Uninstalling removes the startup entry.
 - A one-time "Hover for controls" hint under the time, until the pointer first
   goes over the widget.
 - A changelog; each release's notes now come from it.

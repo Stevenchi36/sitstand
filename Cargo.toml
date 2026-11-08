@@ -64,3 +64,13 @@ out-dir = "target/release"
 [package.metadata.packager.nsis]
 # Lets the uninstaller offer (unticked by default) to delete saved settings too.
 appdata-paths = ["$APPDATA/SitStand"]
+# Extra NSIS script, placed outside any section. `un.onUninstSuccess` runs after a
+# successful uninstall: it removes the "Start with Windows" entry (the key and name
+# must match `platform::set_start_with_windows`). If an update reinstalls through
+# the uninstaller, the app writes the entry again when it next starts.
+# `'''` is a TOML literal string, so the backslashes stay as they are.
+preinstall-section = '''
+Function un.onUninstSuccess
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Sit-Stand Timer"
+FunctionEnd
+'''

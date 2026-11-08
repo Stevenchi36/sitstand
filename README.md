@@ -45,8 +45,7 @@ Only one copy of the app runs at a time: launching it again (Start menu,
 taskbar pin) just brings the running widget forward, even if it was hidden.
 
 To have it start when you sign in, tick **Start with Windows** at the bottom of
-the settings. (Turn it off before uninstalling; otherwise Windows keeps a
-harmless startup entry pointing at the removed program.)
+the settings. Uninstalling removes the startup entry.
 
 ## Settings
 

@@ -424,10 +424,11 @@ impl SitStandApp {
 
     /// Makes Windows' startup list match the "Start with Windows" setting.
     fn apply_start_with_windows(&mut self) {
-        // A debug build would register `target\debug\sitstand.exe` to run at
-        // sign-in, which nobody wants. `cfg!` is true/false at compile time.
-        if cfg!(debug_assertions) {
-            eprintln!("Debug build: leaving Windows startup unchanged");
+        // A copy run from cargo's `target` folder (debug or release) would point
+        // the startup entry at itself, away from the installed copy.
+        // `is_ok_and` is true only for an `Ok` path that passes the check.
+        if std::env::current_exe().is_ok_and(|exe| crate::platform::is_cargo_build(&exe)) {
+            eprintln!("Cargo build: leaving Windows startup unchanged");
             return;
         }
         // `.err()` keeps the error message, if any, and drops the `Ok`.
@@ -1001,6 +1002,11 @@ impl SitStandApp {
             .changed()
         {
             self.apply_start_with_windows();
+            // If Windows refused, flip the box back so it shows what's really set
+            // up; the message below says why.
+            if self.startup_error.is_some() {
+                self.config.start_with_windows = !self.config.start_with_windows;
+            }
         }
         if let Some(err) = &self.startup_error {
             ui.label(
