@@ -11,6 +11,15 @@ Release notes, so add one (moving things out of **Unreleased**) before tagging.
   goes over the widget.
 - A changelog; each release's notes now come from it.
 
+### Changed
+
+- Schedule files: a label's kind (sit, stand or break, which picks the chime and
+  default color) now comes from its whole first word. `sit down`, `standing` and
+  `stand-up` work as before, but labels like `situps` or `standup meeting` are now
+  breaks instead of sit and stand.
+- Schedule files have a written compatibility promise: the format only grows, so
+  files that work now keep working (`docs/sstc-format.md`, "Compatibility").
+
 ### Fixed
 
 - Long tooltips (such as an update error) were cut off at the edge of the window.

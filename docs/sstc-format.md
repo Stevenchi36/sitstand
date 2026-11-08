@@ -30,6 +30,7 @@ long break: #b07cff
 8. [Errors](#errors)
 9. [Limits](#limits)
 10. [Examples](#examples)
+11. [Compatibility](#compatibility)
 
 ## Using schedule files
 
@@ -66,13 +67,14 @@ Every number needs a unit (`30` alone is an error), decimals aren't allowed (wri
 required. It's shown in capitals on the widget (`- 5m stand up` shows **STAND UP**)
 and used as-is in notifications.
 
-How a label **starts** decides its kind, ignoring case:
+A label's **first word** decides its kind, ignoring case. The first word ends at
+anything that isn't a letter, so `stand-up` counts as `stand`.
 
-| Label starts with | Kind | Default color | Chime |
+| First word | Kind | Default color | Chime |
 | --- | --- | --- | --- |
-| `sit` (sit, sitting, Sit down...) | sit | the **Sit** color in settings | sit chime |
-| `stand` (stand, standing, stand up...) | stand | the **Stand** color | stand chime |
-| anything else (break, walk, lunch...) | break | the **Break** color | stand chime |
+| `sit`, `sits`, `sitting` (sit, Sit down, sitting work...) | sit | the **Sit** color in settings | sit chime |
+| `stand`, `stands`, `standing` (stand, stand up, stand-up...) | stand | the **Stand** color | stand chime |
+| anything else (break, walk, lunch, situps, standup meeting...) | break | the **Break** color | stand chime |
 
 A label can have [its own color](#label-colors) instead.
 
@@ -366,3 +368,12 @@ lunch: #ff7a59
   - 20m stand
 - 5m wrap up [no sound]
 ```
+
+## Compatibility
+
+The format only grows. Later versions may add options, settings or syntax, but a
+file that works today keeps working, and keeps meaning the same thing, in every
+later version. So files don't carry a version number.
+
+The other direction isn't promised: a file using something new shows an error
+("unknown option", for example) in an older version of the app.

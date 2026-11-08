@@ -23,8 +23,9 @@
 //!
 //! The rules:
 //! - `- <length> <label>`: an interval. Lengths: `90s`, `30m`, `1h`, `1h30m`.
-//!   A label starting with "sit" or "stand" uses that mode's color and chime;
-//!   anything else (break, walk, lunch...) uses the break color.
+//!   A label whose first word is sit/sits/sitting or stand/stands/standing uses
+//!   that mode's color and chime; anything else (break, walk, lunch...) uses the
+//!   break color.
 //! - `<N>x`: repeat. If the next line is indented more, the repeat holds the
 //!   indented lines. Otherwise it holds the lines that follow, up to a blank line.
 //! - `#` starts a comment, to the end of the line, when it begins the line or is
@@ -51,6 +52,12 @@
 //! long break: #c0ff33
 //! *****
 //! ```
+//!
+//! **Compatibility rule:** the format only ever grows. New options, settings or
+//! syntax may be added, but a file that parses today must keep parsing and mean
+//! the same thing in every later version. That's why there's no version number in
+//! the file: anything new is something older versions reject as unknown, never a
+//! changed meaning of something they accept. (`docs/sstc-format.md` says the same.)
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -71,7 +78,7 @@ pub const POMODORO: &str = "\
 #   - <length> <label>   an interval, e.g. `- 30m sit`, `- 90s stand`, `- 1h30m lunch`
 #   <N>x                 repeat the lines below it, up to the next blank line
 #                        (or the indented lines below it, which lets repeats nest)
-# Labels starting with \"sit\" or \"stand\" get that color; anything else is a break.
+# Labels whose first word is \"sit\" or \"stand\" get that color; anything else is a break.
 # After the last line, the schedule starts over. Edit, save, then press Reload.
 #
 # Options in [brackets] at the end of a line apply when that interval starts
@@ -318,14 +325,20 @@ pub fn describe_duration(d: Duration) -> String {
     }
 }
 
+/// A label's kind comes from its first word, so "sit down" and "stand-up" count,
+/// but "situps" and "standup meeting" are breaks rather than sit and stand.
 fn mode_for_label(label: &str) -> Mode {
     let label = label.to_lowercase();
-    if label.starts_with("sit") {
-        Mode::Sit
-    } else if label.starts_with("stand") {
-        Mode::Stand
-    } else {
-        Mode::Break
+    // Split at anything that isn't a letter (spaces, hyphens, digits...) and keep
+    // the first piece. `unwrap_or("")` covers the (impossible) empty iterator.
+    let first_word = label
+        .split(|c: char| !c.is_alphabetic())
+        .next()
+        .unwrap_or("");
+    match first_word {
+        "sit" | "sits" | "sitting" => Mode::Sit,
+        "stand" | "stands" | "standing" => Mode::Stand,
+        _ => Mode::Break,
     }
 }
 
@@ -923,6 +936,24 @@ mod tests {
         assert_eq!(schedule.step(0).mode, Mode::Sit);
         assert_eq!(schedule.step(1).mode, Mode::Stand);
         assert_eq!(schedule.step(2).mode, Mode::Break);
+    }
+
+    #[test]
+    fn only_the_first_whole_word_picks_the_mode() {
+        // `(label, expected)` pairs; `for (a, b) in [...]` takes each pair apart.
+        for (label, mode) in [
+            ("SIT", Mode::Sit),
+            ("sits", Mode::Sit),
+            ("stand-up", Mode::Stand),
+            ("Standing desk", Mode::Stand),
+            ("situps", Mode::Break),
+            ("sitcom break", Mode::Break),
+            ("standup meeting", Mode::Break),
+            ("standard break", Mode::Break),
+            ("walk then sit", Mode::Break),
+        ] {
+            assert_eq!(mode_for_label(label), mode, "label {label:?}");
+        }
     }
 
     #[test]
