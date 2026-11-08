@@ -50,6 +50,20 @@ Settings → Apps. To update, quit the app (tray → Quit) and run a newer setup
 file over the old install. Bump `version` in `Cargo.toml` so Settings shows the
 new number.
 
+### Releasing
+
+Bump `version` in `Cargo.toml`, commit, then push a matching tag:
+
+```
+git tag v0.1.3
+git push origin main --tags
+```
+
+The Release workflow (`.github/workflows/release.yml`) checks the tag matches
+`Cargo.toml`, runs the tests, builds the installer and publishes it as a GitHub
+Release. CI (`.github/workflows/ci.yml`) runs `cargo fmt --check`, clippy (no
+warnings allowed) and the tests on every push and pull request.
+
 Installer options live under `[package.metadata.packager]` in `Cargo.toml`.
 
 Only one copy of the app runs at a time: launching it again (Start menu,

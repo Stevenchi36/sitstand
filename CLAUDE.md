@@ -68,7 +68,11 @@ unsaved). When adding a field: give it a value in `impl Default`, clamp it in
   "Access is denied" until it's stopped.
 - Before finishing a change: `cargo fmt`, `cargo clippy --all-targets` (keep it at
   zero warnings), `cargo test`.
-- Releasing: bump `version` in `Cargo.toml`, then `cargo packager --release`.
+- Releasing: bump `version` in `Cargo.toml`, commit, then push a matching tag
+  (`git tag v0.1.3 && git push --tags`). `.github/workflows/release.yml` builds the
+  installer and publishes the GitHub Release. `cargo packager --release` builds it locally.
+- CI (`.github/workflows/ci.yml`) runs fmt, clippy with `-D warnings`, and tests on
+  Windows for every push and PR.
 
 ## Checking the UI
 
