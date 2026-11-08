@@ -73,7 +73,10 @@ unsaved). When adding a field: give it a value in `impl Default`, clamp it in
   "Access is denied" until it's stopped.
 - Before finishing a change: `cargo fmt`, `cargo clippy --all-targets` (keep it at
   zero warnings), `cargo test`.
-- Releasing: bump `version` in `Cargo.toml`, commit, then push a matching tag
+- User-visible changes get a line under **Unreleased** in `CHANGELOG.md`.
+- Releasing: move the Unreleased entries into a `## [x.y.z] - <date>` section
+  (the release workflow fails without one; it becomes the release notes), bump
+  `version` in `Cargo.toml`, commit, then push a matching tag
   (`git tag v0.1.3 && git push --tags`). `.github/workflows/release.yml` builds and
   signs the installer, writes `latest.json`, and publishes the GitHub Release.
   `cargo packager --release` builds an unsigned installer locally.

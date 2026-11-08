@@ -34,6 +34,28 @@ jobs:
           }
           "VERSION=$version" >> $env:GITHUB_ENV
 
+      # Fails early (before the long build) if CHANGELOG.md has no section for
+      # this version.
+      - name: Release notes from CHANGELOG.md
+        run: |
+          # The lines after "## [<version>]", up to the next "## " heading.
+          $lines = Get-Content CHANGELOG.md
+          $heading = $lines | Select-String -SimpleMatch "## [$env:VERSION]" | Select-Object -First 1
+          if (-not $heading) {
+            Write-Error "CHANGELOG.md has no '## [$env:VERSION]' section"
+            exit 1
+          }
+          $notes = foreach ($line in $lines[$heading.LineNumber..($lines.Count - 1)]) {
+            if ($line -match '^## ') { break }
+            $line
+          }
+          $text = ($notes -join "`n").Trim()
+          if (-not $text) {
+            Write-Error "The '## [$env:VERSION]' section of CHANGELOG.md is empty"
+            exit 1
+          }
+          $text | Set-Content -Encoding utf8NoBOM release-notes.md
+
       - run: cargo test
 
       # Same version as used locally. Downloads a prebuilt binary when it can.
@@ -79,4 +101,4 @@ jobs:
             "target/release/sitstand_${env:VERSION}_x64-setup.exe.sig" `
             "target/release/latest.json" `
             --title "Sit-Stand Timer $env:VERSION" `
-            --generate-notes
+            --notes-file release-notes.md

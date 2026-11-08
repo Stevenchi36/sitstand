@@ -122,6 +122,9 @@ pub struct Config {
     pub window_pos: Option<[f32; 2]>,
     /// Look for a new release on GitHub once a day (installing still asks first).
     pub check_for_updates: bool,
+    /// The pointer has been over the widget at least once, so the "Hover for
+    /// controls" hint is no longer needed.
+    pub hover_hint_seen: bool,
 }
 
 // `Default` is a standard trait: `Config::default()` gives the starting settings.
@@ -150,6 +153,7 @@ impl Default for Config {
             compact: false,
             window_pos: None,
             check_for_updates: true,
+            hover_hint_seen: false,
         }
     }
 }

@@ -45,6 +45,12 @@ pub fn window_size(config: &Config, settings_open: bool) -> [f32; 2] {
     }
 }
 
+/// Tooltips can't draw outside our small window, and egui lets them grow to 500
+/// points wide, so long ones got cut off. Wrap them to the window's width instead.
+fn fit_tooltips(ctx: &egui::Context, window: [f32; 2]) {
+    ctx.all_styles_mut(|style| style.spacing.tooltip_width = window[0] - 20.0);
+}
+
 fn rgb(c: [u8; 3]) -> Color32 {
     Color32::from_rgb(c[0], c[1], c[2])
 }
@@ -376,6 +382,7 @@ impl SitStandApp {
         // on the digits. We want those to reach the window (drag / click to start).
         cc.egui_ctx
             .all_styles_mut(|style| style.interaction.selectable_labels = false);
+        fit_tooltips(&cc.egui_ctx, window_size(&config, false));
 
         let (schedule, schedule_error) = schedule_or_fallback(&config);
         let schedule_files = config.list_schedules();
@@ -567,6 +574,7 @@ impl SitStandApp {
     fn apply_window_size(&self, ctx: &egui::Context) {
         let size = window_size(&self.config, self.show_settings);
         ctx.send_viewport_cmd(ViewportCommand::InnerSize(size.into()));
+        fit_tooltips(ctx, size);
     }
 
     fn set_settings_open(&mut self, ctx: &egui::Context, open: bool) {
@@ -650,7 +658,7 @@ impl SitStandApp {
         // Text above and below the time must fit inside the ring, which is
         // narrower there than across the middle.
         let row_offset = 26.0;
-        let max_width = 80.0;
+        let max_width = 84.0; // the ring's inner edge is about 85 wide at those rows
 
         // Above the time: the step's label.
         let flashing = self.is_flashing(now);
@@ -676,6 +684,8 @@ impl SitStandApp {
         // widget, otherwise a one-line status.
         let below = center + vec2(0.0, row_offset);
         if ui.rect_contains_pointer(rect) {
+            // They've found the controls; the first-run hint can go.
+            self.config.hover_hint_seen = true;
             let size = vec2(20.0, 20.0);
             let toggle = egui::Rect::from_center_size(below - vec2(12.0, 0.0), size);
             let skip = toggle.translate(vec2(24.0, 0.0));
@@ -705,27 +715,35 @@ impl SitStandApp {
                 self.set_settings_open(ui.ctx(), true);
             }
         } else {
-            // `(String, Color32)`: what to say, and in what color.
-            let (status, color) = if flashing {
-                ("Switch!".to_owned(), Color32::WHITE)
+            // `(String, Color32, f32)`: what to say, in what color, at what size.
+            let (status, color, size) = if flashing {
+                ("Switch!".to_owned(), Color32::WHITE, 11.0)
             } else if self.awaiting_click {
-                ("Click to start".to_owned(), Color32::WHITE)
+                ("Click to start".to_owned(), Color32::WHITE, 11.0)
             } else if self.click_through {
-                ("Click-through".to_owned(), Color32::GRAY)
+                ("Click-through".to_owned(), Color32::GRAY, 11.0)
             } else if self.schedule_error.is_some() {
-                ("Schedule error".to_owned(), ui.visuals().warn_fg_color)
+                (
+                    "Schedule error".to_owned(),
+                    ui.visuals().warn_fg_color,
+                    11.0,
+                )
+            } else if !self.config.hover_hint_seen {
+                // Until the first hover, nothing on screen says the controls exist.
+                // Slightly smaller, so the whole phrase fits inside the ring.
+                ("Hover for controls".to_owned(), Color32::WHITE, 10.0)
             } else if !self.timer.is_running() {
-                ("Paused".to_owned(), Color32::GRAY)
+                ("Paused".to_owned(), Color32::GRAY, 11.0)
             } else if let Some(rounds) = self.timer.step().rounds_text() {
-                (rounds, Color32::GRAY)
+                (rounds, Color32::GRAY, 11.0)
             } else {
-                (String::new(), Color32::GRAY)
+                (String::new(), Color32::GRAY, 11.0)
             };
             paint_fitted(
                 ui.painter(),
                 below,
                 status,
-                FontId::proportional(11.0),
+                FontId::proportional(size),
                 color,
                 max_width,
             );
@@ -741,6 +759,7 @@ impl SitStandApp {
         let hovered = ui.rect_contains_pointer(rect);
         let time = format_mm_ss(self.timer.remaining(now));
         if hovered {
+            self.config.hover_hint_seen = true;
             let size = vec2(20.0, 20.0);
             let y = rect.center().y - 1.0;
             let skip = egui::Rect::from_center_size(egui::pos2(rect.right() - 20.0, y), size);
