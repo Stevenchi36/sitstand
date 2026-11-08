@@ -40,7 +40,9 @@ jobs:
         run: |
           # The lines after "## [<version>]", up to the next "## " heading.
           $lines = Get-Content CHANGELOG.md
-          $heading = $lines | Select-String -SimpleMatch "## [$env:VERSION]" | Select-Object -First 1
+          # Anchored at the line start, with the version escaped (its dots are literal).
+          $pattern = "^## \[$([regex]::Escape($env:VERSION))\]"
+          $heading = $lines | Select-String -Pattern $pattern | Select-Object -First 1
           if (-not $heading) {
             Write-Error "CHANGELOG.md has no '## [$env:VERSION]' section"
             exit 1
