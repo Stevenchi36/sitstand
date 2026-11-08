@@ -44,6 +44,10 @@ after unplugging a monitor) and Quit. Hover the tray icon to see the time left.
 Only one copy of the app runs at a time: launching it again (Start menu,
 taskbar pin) just brings the running widget forward, even if it was hidden.
 
+To have it start when you sign in, tick **Start with Windows** at the bottom of
+the settings. (Turn it off before uninstalling; otherwise Windows keeps a
+harmless startup entry pointing at the removed program.)
+
 ## Settings
 
 Change them in the settings panel; they're saved automatically to:
@@ -75,6 +79,7 @@ parsed, it's renamed to `config.toml.bad` and the app starts with defaults.
 | `window_pos` | (unset) | Remembered window position |
 | `check_for_updates` | true | Look for a new release on GitHub once a day (installing still asks) |
 | `hover_hint_seen` | false | Set once the pointer has been over the widget; hides the "Hover for controls" hint |
+| `start_with_windows` | false | Start the app when you sign in (a per-user `Run` registry entry, also listed in Task Manager → Startup apps) |
 
 Click-through is deliberately *not* saved, so the widget always starts clickable.
 

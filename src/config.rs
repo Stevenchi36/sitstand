@@ -125,6 +125,8 @@ pub struct Config {
     /// The pointer has been over the widget at least once, so the "Hover for
     /// controls" hint is no longer needed.
     pub hover_hint_seen: bool,
+    /// Start the app when you sign in to Windows (see `platform::set_start_with_windows`).
+    pub start_with_windows: bool,
 }
 
 // `Default` is a standard trait: `Config::default()` gives the starting settings.
@@ -154,6 +156,7 @@ impl Default for Config {
             window_pos: None,
             check_for_updates: true,
             hover_hint_seen: false,
+            start_with_windows: false,
         }
     }
 }

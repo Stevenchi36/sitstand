@@ -359,6 +359,8 @@ pub struct SitStandApp {
     show_requests: std::sync::mpsc::Receiver<()>,
     /// Looks for new releases, and installs one when asked.
     updates: Updates,
+    /// Why the "Start with Windows" entry couldn't be written, if it couldn't.
+    startup_error: Option<String>,
 }
 
 impl SitStandApp {
@@ -388,7 +390,8 @@ impl SitStandApp {
         let schedule_files = config.list_schedules();
         let mut timer = Timer::new(schedule);
         timer.set_auto_continue(config.auto_start_next);
-        SitStandApp {
+        // `let mut app = ...; ...; app`: build the struct, adjust it, then return it.
+        let mut app = SitStandApp {
             // `config.clone()` makes a separate copy; afterwards `config` itself is
             // *moved* into the struct (no copy), and can't be used here any more.
             saved_config: config.clone(),
@@ -411,7 +414,25 @@ impl SitStandApp {
             visible: true,
             show_requests: instance.listen(&cc.egui_ctx),
             updates: Updates::new(),
+            startup_error: None,
+        };
+        // Write the startup entry again in case the program has moved (e.g. a new
+        // install folder), so it always points at this copy.
+        app.apply_start_with_windows();
+        app
+    }
+
+    /// Makes Windows' startup list match the "Start with Windows" setting.
+    fn apply_start_with_windows(&mut self) {
+        // A debug build would register `target\debug\sitstand.exe` to run at
+        // sign-in, which nobody wants. `cfg!` is true/false at compile time.
+        if cfg!(debug_assertions) {
+            eprintln!("Debug build: leaving Windows startup unchanged");
+            return;
         }
+        // `.err()` keeps the error message, if any, and drops the `Ok`.
+        self.startup_error =
+            crate::platform::set_start_with_windows(self.config.start_with_windows).err();
     }
 
     /// An interval's color: its own from the schedule file's ***** block if it has
@@ -974,6 +995,20 @@ impl SitStandApp {
         self.update_settings(ui);
 
         section_heading(ui, "", true);
+        if ui
+            .checkbox(&mut self.config.start_with_windows, "Start with Windows")
+            .on_hover_text("Start the timer when you sign in to Windows")
+            .changed()
+        {
+            self.apply_start_with_windows();
+        }
+        if let Some(err) = &self.startup_error {
+            ui.label(
+                RichText::new(format!("Couldn't change startup: {err}"))
+                    .small()
+                    .color(ui.visuals().warn_fg_color),
+            );
+        }
         ui.horizontal(|ui| {
             if ui.button("Test alert").clicked() {
                 // As if the current interval had just ended.

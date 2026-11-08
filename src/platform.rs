@@ -121,6 +121,60 @@ pub fn register_app_identity() {
 #[cfg(not(target_os = "windows"))]
 pub fn register_app_identity() {}
 
+/// Adds or removes this program from the ones Windows starts when you sign in.
+/// Uses the per-user `Run` registry key (no admin needed); the entry also shows
+/// up, and can be switched off, in Task Manager → Startup apps.
+#[cfg(target_os = "windows")]
+pub fn set_start_with_windows(on: bool) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{
+        HKEY_CURRENT_USER, REG_SZ, RegDeleteKeyValueW, RegSetKeyValueW,
+    };
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Run");
+    let name = wide("Sit-Stand Timer");
+
+    let status = if on {
+        // `?` returns early with the error if the path can't be found;
+        // `map_err` first turns that error into a message.
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        // Quoted, because the install folder has spaces in it.
+        let command = wide(&format!("\"{}\"", exe.display()));
+        // `unsafe`: Windows API call. The pointers are to the 0-terminated buffers
+        // above, and the size is the command's length in bytes.
+        unsafe {
+            RegSetKeyValueW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                name.as_ptr(),
+                REG_SZ,
+                command.as_ptr() as *const core::ffi::c_void,
+                (command.len() * 2) as u32,
+            )
+        }
+    } else {
+        // Same buffers as above; deleting a value that isn't there is fine.
+        match unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr()) } {
+            ERROR_FILE_NOT_FOUND => ERROR_SUCCESS,
+            status => status,
+        }
+    };
+    if status == ERROR_SUCCESS {
+        Ok(())
+    } else {
+        Err(format!("Windows error {status}"))
+    }
+}
+
+/// Other platforms: not supported, so there's nothing to change.
+#[cfg(not(target_os = "windows"))]
+pub fn set_start_with_windows(_on: bool) -> Result<(), String> {
+    Ok(())
+}
+
 /// Show a folder in the system file manager (Explorer on Windows).
 pub fn open_folder(path: &std::path::Path) {
     #[cfg(target_os = "windows")]
