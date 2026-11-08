@@ -5,6 +5,8 @@ Release notes, so add one (moving things out of **Unreleased**) before tagging.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-08
+
 ### Added
 
 - **Start with Windows** setting (bottom of the settings): starts the timer when
