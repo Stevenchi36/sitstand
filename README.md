@@ -4,6 +4,27 @@ A small, always-on-top desktop widget that times sitting and standing intervals
 for a sit/stand desk. Native Rust ([egui](https://github.com/emilk/egui)), no
 browser engine, one small `.exe`.
 
+## Download
+
+Get `sitstand_<version>_x64-setup.exe` from the
+[latest release](https://github.com/Stevenchi36/sitstand/releases/latest) and run
+it. It installs for your user only (no admin prompt), and later versions update
+from inside the app.
+
+### Windows security warnings
+
+The app isn't code-signed (that costs money), so Windows doesn't know who made it
+and may warn about it. It's built from this repository's source by GitHub Actions;
+see `.github/workflows/release.yml`.
+
+- **"Windows protected your PC"** (SmartScreen) when running the installer: click
+  **More info**, then **Run anyway**.
+- **Microsoft Defender** may flag it as a trojan, typically
+  `Trojan:Win32/Bearfoos.A!ml`. The `!ml` means a machine-learning guess, a common
+  false alarm for new unsigned programs. To allow it: Windows Security → Virus &
+  threat protection → Protection history → open the entry → **Actions** →
+  **Allow on device**, then run the installer again.
+
 ## Install Rust (Windows)
 
 1. Install the **Visual Studio Build Tools** with the **"Desktop development with C++"**
