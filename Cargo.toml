@@ -1,0 +1,63 @@
+[package]
+name = "sitstand"
+version = "0.1.2"
+edition = "2024"
+
+[dependencies]
+# `default-features = false` turns off optional parts we don't need, which keeps
+# the binary small. `glow` is the OpenGL renderer (lighter than wgpu, and handles
+# transparent windows well). `wayland`/`x11` only matter if this is ever built on Linux.
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+notify-rust = "4"
+# Only audio playback + WAV decoding: no microphone recording, no mp3/flac/ogg.
+rodio = { version = "0.23", default-features = false, features = ["playback", "wav"] }
+# Lets us get the native window handle from eframe (used for the Windows fix below).
+raw-window-handle = "0.6"
+# System-wide keyboard shortcut (works even when another app has focus).
+global-hotkey = "0.9"
+# Saving settings: serde converts our Config struct to/from TOML text, and
+# `directories` finds the right per-user config folder on each OS.
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+directories = "6"
+# System tray icon and its menu.
+tray-icon = "0.26"
+# The system's own "choose a folder" dialog, for picking the schedules folder.
+rfd = "0.18"
+
+# Only pulled in when building for Windows: direct access to the Windows API,
+# used for the window-edge fixes and the single-instance check.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",       # window border/corner fix
+    "Win32_Security",           # needed by CreateEventW's signature
+    "Win32_System_Threading",   # single-instance check
+    "Win32_System_Registry",    # registering the app ID for notifications
+    "Win32_UI_Shell",           # setting the app ID on our process
+] }
+# The windowing library eframe is built on (same version eframe uses, so nothing extra
+# is compiled). Used to switch off its borderless-window drop shadow.
+winit = "0.30"
+
+# Used by build.rs (not by the app itself) to put the icon into the Windows .exe.
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = "s"   # optimize for size
+lto = true        # link-time optimization: slower build, smaller/faster binary
+strip = true      # drop debug symbols from the release .exe
+
+# Installer settings for `cargo packager --release` (see README).
+[package.metadata.packager]
+product-name = "Sit-Stand Timer"
+identifier = "com.sitstand.timer"
+icons = ["assets/logo.png", "assets/logo.ico"]
+before-packaging-command = "cargo build --release"
+formats = ["nsis"]
+out-dir = "target/release"
+
+[package.metadata.packager.nsis]
+# Lets the uninstaller offer (unticked by default) to delete saved settings too.
+appdata-paths = ["$APPDATA/SitStand"]
