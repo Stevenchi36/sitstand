@@ -5,6 +5,16 @@ Release notes, so add one (moving things out of **Unreleased**) before tagging.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-10
+
+### Fixed
+
+- The widget now stays on screen in any corner of any monitor. Opening settings
+  or switching compact mode grows it away from the nearest screen edges instead
+  of always to the right and down, and closing settings puts it back where it was.
+- If the widget's saved position is on a monitor that's no longer connected, it
+  starts on the nearest screen instead of off-screen.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added
