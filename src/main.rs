@@ -7,6 +7,7 @@ mod alert;
 mod app;
 mod config;
 mod hotkey;
+mod placement;
 mod platform;
 mod schedule;
 mod single_instance;

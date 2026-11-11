@@ -12,6 +12,7 @@ use egui::{
 use crate::alert::{self, AlertPlan, Audio};
 use crate::config::{AlertStyle, Config, FlashStyle};
 use crate::hotkey::{self, ClickThroughHotkey};
+use crate::placement;
 use crate::schedule::{self, Reminder, Schedule, Step, describe_duration};
 use crate::single_instance::SingleInstance;
 use crate::timer::{Mode, Timer, TimerEvent};
@@ -49,6 +50,19 @@ pub fn window_size(config: &Config, settings_open: bool) -> [f32; 2] {
 /// points wide, so long ones got cut off. Wrap them to the window's width instead.
 fn fit_tooltips(ctx: &egui::Context, window: [f32; 2]) {
     ctx.all_styles_mut(|style| style.spacing.tooltip_width = window[0] - 20.0);
+}
+
+/// The window's rect on the desktop, in points. `None` while it's minimized.
+fn window_rect(ctx: &egui::Context) -> Option<egui::Rect> {
+    ctx.input(|i| i.viewport().outer_rect)
+}
+
+/// The work area of the monitor under `rect` (see `platform::work_area`), in points.
+/// Windows works in physical pixels, so convert there and back.
+fn work_area(ctx: &egui::Context, rect: egui::Rect) -> Option<egui::Rect> {
+    let ppp = ctx.pixels_per_point();
+    // `.map` runs the closure only on a `Some`, and passes a `None` straight through.
+    crate::platform::work_area(rect * ppp).map(|area| area / ppp)
 }
 
 fn rgb(c: [u8; 3]) -> Color32 {
@@ -346,6 +360,12 @@ pub struct SitStandApp {
     /// arrives here (see `browse_for_folder`).
     folder_pick: Option<std::sync::mpsc::Receiver<std::path::PathBuf>>,
     show_settings: bool,
+    /// Where the widget was before the settings panel opened (which may have moved
+    /// it to fit on screen), so closing the panel can put it back. Forgotten if the
+    /// panel is dragged somewhere else.
+    settings_home: Option<egui::Rect>,
+    /// Whether the startup check that the window is on a connected monitor has run.
+    checked_on_screen: bool,
     /// Mouse clicks go "through" the widget to whatever is underneath.
     /// Deliberately not a saved setting, so the app never starts up unclickable.
     click_through: bool,
@@ -408,6 +428,8 @@ impl SitStandApp {
             awaiting_click: false,
             click_started_at: None,
             show_settings: false,
+            settings_home: None,
+            checked_on_screen: false,
             click_through: false,
             hotkey: ClickThroughHotkey::register(&cc.egui_ctx),
             tray: Tray::new(&cc.egui_ctx),
@@ -593,19 +615,38 @@ impl SitStandApp {
         Some(alert.started + every * (alert.repeats_done + 1))
     }
 
-    fn apply_window_size(&self, ctx: &egui::Context) {
+    /// Resize the window for the current view, moving it so it grows away from the
+    /// nearest screen edges and stays on its monitor (see `placement::place`).
+    /// `from` is the rect to measure from; `None` means where the window is now.
+    fn apply_window_size(&self, ctx: &egui::Context, from: Option<egui::Rect>) {
         let size = window_size(&self.config, self.show_settings);
+        // `if let ... && let ...`: both must match, otherwise skip the move and just
+        // resize (e.g. while minimized, or if Windows can't say where the monitor is).
+        if let Some(old) = from.or_else(|| window_rect(ctx))
+            && let Some(area) = work_area(ctx, old)
+        {
+            let new = placement::place(old, size.into(), area);
+            ctx.send_viewport_cmd(ViewportCommand::OuterPosition(new.min));
+        }
         ctx.send_viewport_cmd(ViewportCommand::InnerSize(size.into()));
         fit_tooltips(ctx, size);
     }
 
     fn set_settings_open(&mut self, ctx: &egui::Context, open: bool) {
-        if open && !self.show_settings {
-            // Pick up schedules saved into the folder since we last looked.
-            self.rescan_schedules();
-        }
+        // Matching on a tuple checks both values at once; `_` covers every other case.
+        let from = match (self.show_settings, open) {
+            (false, true) => {
+                // Pick up schedules saved into the folder since we last looked.
+                self.rescan_schedules();
+                self.settings_home = window_rect(ctx);
+                None
+            }
+            // `take` hands back the value and leaves `None` in its place.
+            (true, false) => self.settings_home.take(),
+            _ => None,
+        };
         self.show_settings = open;
-        self.apply_window_size(ctx);
+        self.apply_window_size(ctx, from);
     }
 
     fn set_click_through(&mut self, ctx: &egui::Context, on: bool) {
@@ -648,6 +689,7 @@ impl SitStandApp {
             TrayAction::ToggleClickThrough => self.set_click_through(ctx, !self.click_through),
             TrayAction::ResetPosition => {
                 ctx.send_viewport_cmd(ViewportCommand::OuterPosition(egui::pos2(40.0, 40.0)));
+                self.settings_home = None;
                 self.set_visible(ctx, true);
             }
             TrayAction::InstallUpdate => self.install_update(ctx),
@@ -1316,9 +1358,24 @@ impl eframe::App for SitStandApp {
             self.alert = None;
         }
 
-        // Remember where the window is. (Coordinates far off-screen mean the window
-        // is minimized; don't save those.)
-        let outer = ctx.input(|i| i.viewport().outer_rect);
+        // On the first frame that knows where the window is: if it was saved on a
+        // monitor that's no longer there (or past a screen edge), bring it back.
+        if !self.checked_on_screen
+            && let Some(rect) = window_rect(ctx)
+        {
+            self.checked_on_screen = true;
+            if let Some(area) = work_area(ctx, rect) {
+                let inside = placement::keep_inside(rect, area);
+                if inside.min.distance(rect.min) > 0.5 {
+                    ctx.send_viewport_cmd(ViewportCommand::OuterPosition(inside.min));
+                }
+            }
+        }
+
+        // Remember where the window is. While settings are open, that's where the
+        // widget goes back to, so a restart doesn't open it where the panel was.
+        // (Coordinates far off-screen mean the window is minimized; don't save those.)
+        let outer = self.settings_home.or_else(|| window_rect(ctx));
         if let Some(rect) = outer
             && rect.min.x > -10_000.0
             && rect.min.y > -10_000.0
@@ -1410,6 +1467,8 @@ impl eframe::App for SitStandApp {
         );
         if background.drag_started() {
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+            // Dragged somewhere new: closing settings should stay there, not jump back.
+            self.settings_home = None;
         }
         if background.secondary_clicked() {
             self.set_settings_open(ui.ctx(), !self.show_settings);
@@ -1430,7 +1489,7 @@ impl eframe::App for SitStandApp {
                 self.awaiting_click = true;
             }
             self.config.compact = !self.config.compact;
-            self.apply_window_size(ui.ctx());
+            self.apply_window_size(ui.ctx(), None);
         } else if self.awaiting_click && background.clicked() && !self.show_settings {
             // `else`: the second click of a double-click also counts as a click, and
             // must not start the interval we just put back.

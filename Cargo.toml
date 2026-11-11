@@ -34,6 +34,7 @@ cargo-packager-updater = "0.2"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",       # window border/corner fix
+    "Win32_Graphics_Gdi",       # finding the monitor's work area (window placement)
     "Win32_Security",           # needed by CreateEventW's signature
     "Win32_System_Threading",   # single-instance check
     "Win32_System_Registry",    # registering the app ID for notifications

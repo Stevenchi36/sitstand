@@ -49,6 +49,9 @@ appears in a file, plain-English doc comments on every item.
   visible. Timer ticks, alerts, tray sync, saving and rescans belong in `logic`.
 - egui redraws only when asked. `logic` builds a `wake_in` list of "wake me in X";
   any new periodic work must push its own deadline there, or it stalls while idle.
+- Resize through `apply_window_size`, not a bare `InnerSize`: it also moves the
+  window so it grows away from the nearest screen edges (`placement.rs`, using
+  the monitor's work area from `platform::work_area`).
 - Windows are fixed sizes (`MAIN_SIZE`, `COMPACT_SIZE`, `SETTINGS_SIZE` in `app.rs`).
   The settings panel has about 200px of usable width: a wide grid column or row
   widens everything under it and gets clipped. Check new settings widgets fit.

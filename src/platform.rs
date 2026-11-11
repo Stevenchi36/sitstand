@@ -57,6 +57,49 @@ pub fn remove_os_window_frame(cc: &eframe::CreationContext<'_>) {
 #[cfg(not(target_os = "windows"))]
 pub fn remove_os_window_frame(_cc: &eframe::CreationContext<'_>) {}
 
+/// The work area (the screen minus the taskbar) of the monitor that holds most of
+/// `rect`, or the nearest monitor if `rect` is on none of them (say, a monitor was
+/// unplugged). Both rects are in physical pixels, in the desktop's shared
+/// coordinates, where a monitor left of or above the main one has negative values.
+#[cfg(target_os = "windows")]
+pub fn work_area(rect: eframe::egui::Rect) -> Option<eframe::egui::Rect> {
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromRect,
+    };
+
+    let rect = RECT {
+        left: rect.min.x.round() as i32,
+        top: rect.min.y.round() as i32,
+        right: rect.max.x.round() as i32,
+        bottom: rect.max.y.round() as i32,
+    };
+    // `std::mem::zeroed` makes the struct with every field 0; the API then fills it
+    // in. It needs `cbSize` set first, so it knows which version of the struct it got.
+    let mut info: MONITORINFO = unsafe { std::mem::zeroed() };
+    info.cbSize = size_of::<MONITORINFO>() as u32;
+    // `unsafe`: Windows API calls. `MonitorFromRect` only reads the rect we pass;
+    // `GetMonitorInfoW` writes into `info`, which is exactly the size it expects.
+    let ok = unsafe {
+        let monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+        GetMonitorInfoW(monitor, &mut info)
+    };
+    if ok == 0 {
+        return None;
+    }
+    let w = info.rcWork;
+    Some(eframe::egui::Rect::from_min_max(
+        eframe::egui::pos2(w.left as f32, w.top as f32),
+        eframe::egui::pos2(w.right as f32, w.bottom as f32),
+    ))
+}
+
+/// Other platforms: unknown, so the window is never moved.
+#[cfg(not(target_os = "windows"))]
+pub fn work_area(_rect: eframe::egui::Rect) -> Option<eframe::egui::Rect> {
+    None
+}
+
 /// The app's identity on Windows (an "AppUserModelID"). Windows uses it to
 /// name notifications and to group the running window with a taskbar pin.
 /// Must match `identifier` under `[package.metadata.packager]` in Cargo.toml,
