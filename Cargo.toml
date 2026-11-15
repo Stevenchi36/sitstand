@@ -15,7 +15,7 @@ rodio = { version = "0.23", default-features = false, features = ["playback", "w
 # Lets us get the native window handle from eframe (used for the Windows fix below).
 raw-window-handle = "0.6"
 # System-wide keyboard shortcut (works even when another app has focus).
-global-hotkey = "0.9"
+global-hotkey = "0.10"
 # Saving settings: serde converts our Config struct to/from TOML text, and
 # `directories` finds the right per-user config folder on each OS.
 serde = { version = "1", features = ["derive"] }
